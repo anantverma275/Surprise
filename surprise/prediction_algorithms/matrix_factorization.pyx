@@ -155,6 +155,67 @@ class SVD(AlgoBase):
         self.sgd(trainset)
 
         return self
+    
+    def ascent(self, trainset, item_forget_set, epochs=20):
+
+        # user biases
+        cdef double[::1] bu = self.bu
+        # item biases
+        cdef double[::1] bi = self.bi
+        # user factors
+        cdef double[:, ::1] pu = self.pu
+        # item factors
+        cdef double[:, ::1] qi = self.qi
+
+        cdef int u, i, f
+        cdef int n_factors = self.n_factors
+        cdef bint biased = self.biased
+
+        cdef double r, err, dot, puf, qif
+        cdef double global_mean = self.trainset.global_mean
+
+        cdef double lr_bu = self.lr_bu
+        cdef double lr_bi = self.lr_bi
+        cdef double lr_pu = self.lr_pu
+        cdef double lr_qi = self.lr_qi
+
+        cdef double reg_bu = self.reg_bu
+        cdef double reg_bi = self.reg_bi
+        cdef double reg_pu = self.reg_pu
+        cdef double reg_qi = self.reg_qi
+
+        if not biased:
+            global_mean = 0
+
+        for current_epoch in range(epochs):
+            if self.verbose:
+                print("Processing epoch {}".format(current_epoch))
+
+            for u, i, r in trainset.all_ratings():
+                if i not in item_forget_set:
+                    continue
+                # compute current error
+                dot = 0  # <q_i, p_u>
+                for f in range(n_factors):
+                    dot += qi[i, f] * pu[u, f]
+                err = r - (global_mean + bu[u] + bi[i] + dot)
+
+                # update biases
+                if biased:
+                    bu[u] -= lr_bu * (err - reg_bu * bu[u])
+                    bi[i] -= lr_bi * (err - reg_bi * bi[i])
+
+                # update factors
+                for f in range(n_factors):
+                    puf = pu[u, f]
+                    qif = qi[i, f]
+                    pu[u, f] -= lr_pu * (err * qif - reg_pu * puf)
+                    qi[i, f] -= lr_qi * (err * puf - reg_qi * qif)
+
+        self.bu = np.asarray(bu)
+        self.bi = np.asarray(bi)
+        self.pu = np.asarray(pu)
+        self.qi = np.asarray(qi)
 
     def sgd(self, trainset):
 
