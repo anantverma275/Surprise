@@ -146,6 +146,8 @@ class SVD(AlgoBase):
         self.reg_qi = reg_qi if reg_qi is not None else reg_all
         self.random_state = random_state
         self.verbose = verbose
+        self.descent_test = None
+        self.ascent_test = None
 
         AlgoBase.__init__(self)
 
@@ -217,7 +219,7 @@ class SVD(AlgoBase):
         self.pu = np.asarray(pu)
         self.qi = np.asarray(qi)
 
-    def sgd(self, trainset):
+    def sgd(self, trainset, testset, item_forget_set, ascent_epochs=20):
 
         # OK, let's breath. I've seen so many different implementation of this
         # algorithm that I just not sure anymore of what it should do. I've
@@ -284,7 +286,7 @@ class SVD(AlgoBase):
 
         for current_epoch in range(self.n_epochs):
             if self.verbose:
-                print("Processing epoch {}".format(current_epoch))
+                print("Processing descent epoch {}".format(current_epoch))
 
             for u, i, r in trainset.all_ratings():
                 # compute current error
@@ -309,6 +311,42 @@ class SVD(AlgoBase):
         self.bi = np.asarray(bi)
         self.pu = np.asarray(pu)
         self.qi = np.asarray(qi)
+
+        print("Testing after descent")
+        self.descent_test = self.test(testset)
+        
+        print("Now doing Ascent")
+
+        for current_epoch in range(ascent_epochs):
+            if self.verbose:
+                print("Processing ascent epoch {}".format(current_epoch))
+
+            for u, i, r in trainset.all_ratings():
+                # compute current error
+                dot = 0  # <q_i, p_u>
+                for f in range(n_factors):
+                    dot += qi[i, f] * pu[u, f]
+                err = r - (global_mean + bu[u] + bi[i] + dot)
+
+                # update biases
+                if biased:
+                    bu[u] -= lr_bu * (err - reg_bu * bu[u])
+                    bi[i] -= lr_bi * (err - reg_bi * bi[i])
+
+                # update factors
+                for f in range(n_factors):
+                    puf = pu[u, f]
+                    qif = qi[i, f]
+                    pu[u, f] -= lr_pu * (err * qif - reg_pu * puf)
+                    qi[i, f] -= lr_qi * (err * puf - reg_qi * qif)
+
+        self.bu = np.asarray(bu)
+        self.bi = np.asarray(bi)
+        self.pu = np.asarray(pu)
+        self.qi = np.asarray(qi)
+
+        print("Testing after ascent")
+        self.ascent_test = self.test(testset)
     
 
     def estimate(self, u, i):
