@@ -151,10 +151,10 @@ class SVD(AlgoBase):
 
         AlgoBase.__init__(self)
 
-    def fit(self, trainset):
+    def fit(self, trainset, testset, item_forget_set, ascent_epochs=20):
 
         AlgoBase.fit(self, trainset)
-        self.sgd(trainset)
+        self.sgd(trainset, testset, item_forget_set, ascent_epochs)
 
         return self
     
@@ -219,7 +219,7 @@ class SVD(AlgoBase):
         self.pu = np.asarray(pu)
         self.qi = np.asarray(qi)
 
-    def sgd(self, trainset, testset, item_forget_set, ascent_epochs=20):
+    def sgd(self, trainset, testset, item_forget_set, ascent_epochs):
 
         # OK, let's breath. I've seen so many different implementation of this
         # algorithm that I just not sure anymore of what it should do. I've
